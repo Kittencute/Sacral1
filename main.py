@@ -8,6 +8,8 @@ import ollama
 
 
 class MDUBot:
+    # Change model_name, embed_model_name or persist_path if needed
+    # model_name = "llama3.1:8b" or "deepseek-r1:7b"
     def __init__(self, model_name="gemma3:4b", embed_model_name="mxbai-embed-large", persist_path="./chroma"): # Change persist_path if needed
         self.model = model_name
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
