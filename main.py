@@ -10,7 +10,7 @@ import ollama
 
 class MDUBot:
     # Change model_name, embed_model_name or persist_path if needed
-    # model_name = "llama3.1:8b" or "deepseek-r1:7b"
+    # model_name = "gemma3:4b" or :1b
     def __init__(self, model_name="gemma3:4b", embed_model_name="mxbai-embed-large", persist_path="./chroma"): 
         self.model = model_name
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
@@ -18,8 +18,20 @@ class MDUBot:
         self.retriver = Retriever(self.db, self.embed_model)
 
     def run(self):
+        
+        test_prompts = [
+            "What are the examination components in CDT406?",
+            "What are the prerequisites for CDT406?",
+            "Can you summarize what CDT406 is about?",
+            "I like mathematics, can you recommend specific courses related to this?",
+            "Which courses are included in the CCV20 program?",
+            "exit"  
+        ]
+        
         while True:
-            prompt = input("You: ")
+            prompt = test_prompts.pop(0) 
+            print(f"Test prompt: {prompt}")
+            # prompt = input("You: ")
             if prompt == "exit":
                 break
 
