@@ -1,6 +1,3 @@
-# Remove this if needed 
-# import chroma_patch
-
 from langchain_chroma import Chroma
 from retriever import Retriever
 from langchain_ollama import OllamaEmbeddings
@@ -9,16 +6,14 @@ import ollama
 
 
 class MDUBot:
-    # Change model_name, embed_model_name or persist_path if needed
-    # model_name = "gemma3:4b" or :1b
-    def __init__(self, model_name="gemma3:4b", embed_model_name="mxbai-embed-large", persist_path="./chroma"): 
+    def __init__(self, model_name="gemma3:4b", embed_model_name="mxbai-embed-large", persist_path="./chroma"): # Change persist_path if needed
         self.model = model_name
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
         self.db = Chroma(embedding_function=self.embed_model, persist_directory=persist_path)
         self.retriver = Retriever(self.db, self.embed_model)
 
     def run(self):
-        
+
         test_prompts = [
             "What are the examination components in CDT406?",
             "What are the prerequisites for CDT406?",
@@ -27,6 +22,10 @@ class MDUBot:
             "Which courses are included in the CCV20 program?",
             "exit"  
         ]
+        # test_prompts = [
+        #     "What are the prerequisites for CDT406?",
+        #     "exit"  
+        # ]
         
         while True:
             prompt = test_prompts.pop(0) 
@@ -42,7 +41,25 @@ class MDUBot:
             num_codes = len(program_code) if num_codes == 0 else num_codes
             program_code = program_code
 
-            result = self.retriver.query(prompt, course_code, program_code, num_codes)
+
+            preprocessed_query = ollama.chat(
+                    model="gemma3:4b",
+                messages=[
+                    {"role": "system", "content": "Rephrase the following user question into a more specific and complete version suitable for                  retrieving relevant university course or program information from Mälardalens univeritet. Answer only with the intent and the course code. Answer in this format, Intent: , Code:"},
+                    {"role": "user", "content": prompt}
+                ]
+            )["message"]["content"]
+
+
+            print("Preproccessed: " + preprocessed_query)
+
+
+            result = self.retriver.query(preprocessed_query, course_code, program_code, num_codes)
+
+
+
+
+            # result = self.retriver.query(prompt, course_code, program_code, num_codes)
 
             prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
                         Here is the context about the course or program:\n{result}\n
@@ -64,8 +81,10 @@ class MDUBot:
                     {"role": "user", "content": prompt}
                 ]
             )
-            print(f"\nMDUBot: {response['message']['content']}")
+
+            print(f"\nMDUBot: {response['message']['content']}\n")
 
 
 bot = MDUBot()
 bot.run()
+
