@@ -34,31 +34,35 @@ class MDUBot:
             if prompt == "exit":
                 break
 
-            prompt = prompt.lower().strip()
-            course_code = re.findall(r'\b[a-z]{2,3}\d{3}\b', prompt)
+            preprocessed_query = ollama.chat(
+                    model="gemma3:4b",
+                messages=[
+                    {"role": "system", "content": "Rephrase the following user question into a more specific and complete version suitable for                  retrieving relevant university course or program information from Mälardalens univeritet. Summerize the question into a compact form, format the answer into single important words and dont answer with any extra text or eplanation Answer in this format, Intent: , Coursecode: , Coursename:. If the intent, coursecode or coursename is not found, answer with NONE"},
+                    {"role": "user", "content": prompt}
+                ]
+            )["message"]["content"]
+            
+            
+
+            print("Preproccessed: " + preprocessed_query)
+
+            preprocessed_query = preprocessed_query.lower().strip()
+            course_code = re.findall(r'\b[a-z]{2,3}\d{3}\b', preprocessed_query)
             num_codes = len(course_code)
-            program_code = re.findall(r'\b[a-z]{2,3}\d{2}\b', prompt)
+            program_code = re.findall(r'\b[a-z]{2,3}\d{2}\b', preprocessed_query)
             num_codes = len(program_code) if num_codes == 0 else num_codes
             program_code = program_code
 
 
-            preprocessed_query = ollama.chat(
-                    model="gemma3:4b",
-                messages=[
-                    {"role": "system", "content": "Rephrase the following user question into a more specific and complete version suitable for                  retrieving relevant university course or program information from Mälardalens univeritet. Answer only with the intent and the course code. Answer in this format, Intent: , Code:"},
-                    {"role": "user", "content": prompt}
-                ]
-            )["message"]["content"]
-
-
-            print("Preproccessed: " + preprocessed_query)
-
+            # preprocessed_query = ollama.chat(
+            #         model="gemma3:4b",
+            #     messages=[
+            #         {"role": "system", "content": "Rephrase the following user question into a more specific and complete version suitable for                  retrieving relevant university course or program information from Mälardalens univeritet. Answer in this format, Intent: , Coursecode: , Coursename:. If the intent, coursecode or coursename is not found, answer with NONE"},
+            #         {"role": "user", "content": prompt}
+            #     ]
+            # )["message"]["content"]
 
             result = self.retriver.query(preprocessed_query, course_code, program_code, num_codes)
-
-
-
-
             # result = self.retriver.query(prompt, course_code, program_code, num_codes)
 
             prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
