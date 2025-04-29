@@ -5,18 +5,31 @@ class Retriever:
         self.embed_model = embed_model
         self.db = chroma_client
 
-    # Query vector DB by course_code or program_code if provided, else fetch the 5 most relevant documents
     def query(self, prompt, course_code=None, program_code=None, num_codes=1):
         docs = []
+
+        # If course codes are found, search for each one and collect results
         if course_code:
-            docs = self.db.similarity_search(prompt, k=num_codes, filter={"course_code": course_code[0]})
+            for code in course_code:
+                results = self.db.similarity_search(prompt, k=num_codes, filter={"course_code": code})
+                docs.extend(results)
+
+        # If no course codes, try using program codes instead
         elif program_code:
-            docs = self.db.similarity_search(prompt, k=num_codes, filter={"program_code": program_code[0]})
-        elif not docs or not course_code or not program_code:
-            docs = self.db.similarity_search(prompt, k=5)
-            
-        # Fix Unicode escape sequences in all retrieved documents 
+            for code in program_code:
+                results = self.db.similarity_search(prompt, k=num_codes, filter={"program_code": code})
+                docs.extend(results)
+
+        # If no course or program codes are found, perform a general search
+        if not docs:
+            docs = self.db.similarity_search(prompt, k=num_codes)
+
+        # Try to fix any weird unicode in the results so they look better
         for doc in docs:
-            doc.page_content = doc.page_content.encode().decode('unicode_escape')   
+            try:
+                doc.page_content = doc.page_content.encode().decode('unicode_escape')
+            except Exception:
+                pass # Ignore if decode fails
 
         return docs
+
