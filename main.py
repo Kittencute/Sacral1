@@ -78,7 +78,6 @@ class MDUBot:
             print(f"Program code: {program_code}")
             print(f"Topic keywords: {topic_keywords}")
             print(f"Retrieving for: {' '.join(topic_keywords) if topic_keywords else prompt}")
-            print(f"Chroma DB has {len(self.db._collection.get()['ids'])} documents.")
 
             # Decide how to search based on the extracted codes
             if course_code:
