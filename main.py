@@ -41,16 +41,15 @@ class MDUBot:
             )["message"]["content"].lower().strip()
 
             # If its a topic, ask for keywords
-            if classification == "topic":
-                topic_keywords = ollama.chat(
-                    model="gemma3:4b",
-                    messages=[
-                        {"role": "system", "content": "Extract important topic keywords from this question. Only list important words separated by commas. No explanation."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )["message"]["content"].lower().strip().split(",")
+            topic_keywords_raw = ollama.chat(
+                model="gemma3:4b",
+                messages=[
+                    {"role": "system", "content": "Extract important topic keywords from this question. Only list important words separated by commas. No explanation."},
+                    {"role": "user", "content": prompt}
+                ]
+            )["message"]["content"].lower().strip()
 
-                topic_keywords = [k.strip() for k in topic_keywords if k.strip()]
+            topic_keywords = [k.strip() for k in topic_keywords_raw.split(",") if k.strip()]
 
         return valid_course_code, valid_program_code, topic_keywords
 
