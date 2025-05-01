@@ -1,0 +1,32 @@
+User Prompt: what are the examination components in cdt406?
+Reference Answer: Examination:
+Inlämningsuppgift (INL2), 4 hp, betyg Underkänd (U) eller Godkänd (G)
+Seminarium (SEM2), 1 hp, betyg Underkänd (U) eller Godkänd (G)
+Seminarium (SEM3), 1 hp, betyg Underkänd (U) eller Godkänd (G)
+Seminarium (SEM4), 1 hp, betyg Underkänd (U) eller Godkänd (G)
+Projekt (PRO2), 8 hp, betyg Underkänd (U), 3, 4 eller 5
+MDUBot Response: The examination components for CDT406 (Tillämpad artificiell intelligens) at Mälardalens universitet include:
+
+*   Inlämningsuppgift, 4 högskolepoäng, betyg Godkänd (G)
+*   Övningsuppgift (INL1), 4 högskolepoäng, betyg Godkänd (G)
+*   Seminarie (SEM1), 3 högskolepoäng, betyg Godkänd (G)
+*   Examensarbete, projektarbete, uppsats (UPS1), 8 högskolepoäng, betyg 3, 4 eller 5.
+Cosine Similarity: 0.8586
+BERTScore (F1): 0.8470
+============================================================
+User Prompt: what are the prerequisites for cdt406?
+Reference Answer: Särskild behörighet:
+Minst 120 hp vari ingår programmeringskunskaper i ett högnivåspråk, kunskaper i systemutveckling/systemdesign, förståelse för ett antal AI-metoder varav någon på djup och detaljerad nivå samt kunskaper i hur AI kan integreras i befintliga system.
+Detta kan uppnås genom att ha avslutat kurserna Artificiell intelligens 7,5 hp på G2F-nivå eller Lärande system 7,5 hp på avancerad nivå eller motsvarande.
+Dessutom krävs Svenska B/Svenska 3 samt Engelska A/Engelska 6.
+I de fall kursen ges på engelska görs undantag från kravet på Svenska B/Svenska 3.
+MDUBot Response: The prerequisites for CDT406 (Tillämpad artificiell intelligens) at Mälardalens universitet are as follows:
+
+You need at least 120 hp of education, including programming skills in a high-level language, knowledge of system development/system design, and an understanding of several AI methods, with some at a detailed level. You also need knowledge of how AI can be integrated into existing systems.
+
+This can be fulfilled by having completed courses such as Artificiell intelligens 7,5 hp or Lärande system 7,5 hp, or equivalent courses. 
+
+Furthermore, you must have passed Svenska B/Svenska 3 and Engelska A/Engelska 6. An exception to the Svenska B/Svenska 3 requirement is made if the course is offered in English.
+Cosine Similarity: 0.7542
+BERTScore (F1): 0.8165
+============================================================
