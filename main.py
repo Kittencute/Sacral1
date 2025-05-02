@@ -1,11 +1,13 @@
 # Remove this if needed 
-import chroma_patch
+# import chroma_patch
 
 from langchain_chroma import Chroma
 from retriever import Retriever
 from langchain_ollama import OllamaEmbeddings
 import re
 import ollama
+from langchain.memory import ConversationBufferMemory
+
 
 
 class MDUBot:
@@ -16,17 +18,19 @@ class MDUBot:
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
         self.db = Chroma(embedding_function=self.embed_model, persist_directory=persist_path)
         self.retriver = Retriever(self.db, self.embed_model)
+        self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        self.chat_history = []
 
     def run(self):
         
         test_prompts = [
-            "What are the examination components in CDT406?",
-            "What are the prerequisites for CDT406?",
-            "Can you summarize what CDT406 is about?",
-            "I like mathematics, can you recommend specific courses related to this?",
-            "Which courses are included in the CCV20 program?",
-            "exit"  
-        ]
+    "Can you tell me about the CDT406 course?",
+    "What are the prerequisites for that?",
+    "Which program includes it?",
+    "Is it active this year?",
+    "exit"
+    ]
+
         
         while True:
             prompt = test_prompts.pop(0) 
@@ -37,15 +41,14 @@ class MDUBot:
 
             prompt = prompt.lower().strip()
             course_code = re.findall(r'\b[a-z]{2,3}\d{3}\b', prompt)
-            num_codes = len(course_code)
             program_code = re.findall(r'\b[a-z]{2,3}\d{2}\b', prompt)
-            num_codes = len(program_code) if num_codes == 0 else num_codes
-            program_code = program_code
+            num_codes = len(course_code) or len(program_code)
 
-            result = self.retriver.query(prompt, course_code, program_code, num_codes)
+            context = self.retriver.query(prompt, course_code, program_code, num_codes)
+            context_text = "\n".join([doc.page_content for doc in context])
 
-            prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
-                        Here is the context about the course or program:\n{result}\n
+            system_prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
+                        Here is the context about the course or program:\n{context_text}\n
                         This is the question: {prompt}\n
                         Answer the question by:
                         Providing relevant information from the context.
@@ -58,14 +61,15 @@ class MDUBot:
 
             # response = ollama.generate(model=self.model, prompt=prompt)
             # print(f"\nMDUBot: {response["response"]}")
+            self.chat_history.append({"role": "user", "content": system_prompt})
             response = ollama.chat(
                 model=self.model,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=self.chat_history
             )
-            print(f"\nMDUBot: {response['message']['content']}")
+            bot_reply = response['message']['content']
+            self.chat_history.append({"role": "assistant", "content": bot_reply})
 
+            print(f"\nMDUBot: {bot_reply}")
 
 bot = MDUBot()
 bot.run()
