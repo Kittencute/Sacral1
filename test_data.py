@@ -1,5 +1,13 @@
 test_prompts = [
     {
+        "prompt": "what is the course tillämpad artificiell intelligens about and dva493?",
+        "reference": ""
+    },
+    {
+        "prompt": "I like advnaced mathematics, can you recommend 5 specific courses related to this?",
+        "reference": ""
+    },
+    {
         "prompt": "What are the examination components in CDT406?",
         "reference": """Examination:
 Inlämningsuppgift (INL2), 4 hp, betyg Underkänd (U) eller Godkänd (G)
@@ -119,6 +127,29 @@ Kurser inom år 5
 Robotik:
 - Examensarbete för civilingenjörsexamen i robotik, 30 hp
 - Robotik - projektkurs, 30 hp"""
+    },
+    {
+        "prompt": "exit",
+        "reference": ""
+    }
+]
+
+test_prompts_mem = [
+    {
+        "prompt": "Can you tell me about the CDT406 course?",
+        "reference": ""
+    },
+    {
+        "prompt": "What are the prerequisites for that?",
+        "reference": ""
+    },
+    {
+        "prompt": "Which program includes it?",
+        "reference": ""
+    },
+    {
+        "prompt": "Is it active this year?",
+        "reference": ""
     },
     {
         "prompt": "exit",

@@ -21,7 +21,7 @@ class MDUBot:
         self.retriver = Retriever(self.db, self.embed_model)
 
         self.evaluator = EvalTester(self.embed_model)
-        
+                    
     def run(self):        
         while True:
             item = test_prompts.pop(0) 
@@ -36,16 +36,33 @@ class MDUBot:
                     self.evaluator.log_average_scores(avg_cosine, avg_bert)
                             
                 break
+            
+            intent_llm_prompt = (
+                "You are an information extractor for university course queries.\n"
+                "Extract and label only the following fields from the user's question.\n"
+                "Use this exact format, and leave any field blank if not found:\n\n"
+                "course_name: \n"
+                "program_name: \n"
+                "keywords: \n\n"
+                "Rules:\n"
+                "- 'course_name' is any phrase that sounds like a course (e.g., 'Lärande system').\n"
+                "- 'program_name' contains the word 'program' or 'programmet' (e.g., 'Sjuksköterskeprogrammet').\n"
+                "- 'keywords' reflect what the user is asking about (e.g., overview, prerequisites, examination).\n"
+                "- Do **not** include course or program codes — that is handled separately.\n"
+                "- Do **not** include codes in the course or program names.\n"
+                "- Do **not explain** your output. Just return the field values."
+            )
+            
+            intent_response = ollama.chat(
+                model="gemma3:4b",
+                messages=[
+                    {"role": "system", "content": intent_llm_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+            )["message"]["content"].lower().strip()
 
-            user_prompt = user_prompt.lower().strip()
-            course_code = re.findall(r'\b[a-z]{2,3}\d{3}\b', user_prompt)
-            num_codes = len(course_code)
-            program_code = re.findall(r'\b[a-z]{2,3}\d{2}\b', user_prompt)
-            num_codes = len(program_code) if num_codes == 0 else num_codes
-            program_code = program_code
-            
-            result = self.retriver.query(user_prompt, course_code, program_code, num_codes)
-            
+            result = self.retriver.query(user_prompt, intent_response)
+                      
             llm_prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
                         Here is the context about the course or program:\n{result}\n
                         This is the question: {user_prompt}\n
