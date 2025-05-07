@@ -3,6 +3,11 @@ from retriever import Retriever
 from langchain_ollama import OllamaEmbeddings
 import re
 import ollama
+from eval_tester import EvalTester
+from test_data import test_prompts
+
+cosine_scores = []
+bert_scores = []
 
 
 class MDUBot:
@@ -12,6 +17,8 @@ class MDUBot:
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
         self.db = Chroma(embedding_function=self.embed_model, persist_directory=persist_path)
         self.retriver = Retriever(self.db, self.embed_model)
+
+        self.evaluator = EvalTester(self.embed_model)
 
     def preprocess_query(self, prompt):
         # Try to find course or program codes using regex
@@ -54,20 +61,18 @@ class MDUBot:
         return valid_course_code, valid_program_code, topic_keywords
 
     def run(self):
-        test_prompts = [
-            "What are the examination components in CDT406?",
-            "What are the prerequisites for CDT406?",
-            "Can you summarize what CDT406 is about?",
-            "I like mathematics, can you recommend specific courses related to this?",
-            "Which courses are included in the CCV20 program?",
-            "exit"
-        ]
-
         while True:
-            prompt = test_prompts.pop(0)
+            item = test_prompts.pop(0)
+            prompt = item["prompt"]
+            reference = item["reference"]
+            # prompt = test_prompts.pop(0)
             print(f"\nTest prompt: {prompt}")
 
             if prompt == "exit":
+                if cosine_scores and bert_scores:
+                    avg_cosine = sum(cosine_scores) / len(cosine_scores)
+                    avg_bert = sum(bert_scores) / len(bert_scores)
+                    self.evaluator.log_average_scores(avg_cosine, avg_bert)
                 break
 
             # Preprocess the query to extract course code, program code, and topic keywords
@@ -124,8 +129,18 @@ Answer the question by:
                     {"role": "user", "content": full_prompt}
                 ]
             )
-
+            final_response = response["message"]["content"]
             print(f"\nMDUBot: {response['message']['content']}\n")
+
+            cos_score = self.evaluator.compute_cosine_similarity(prompt, final_response)
+            cosine_scores.append(cos_score)
+            if reference.strip():
+                bert_score = self.evaluator.compute_bertscore(final_response, reference)
+                bert_scores.append(bert_score)
+            else:
+                bert_score = None
+
+            self.evaluator.log_evaluation(prompt, final_response, cos_score, bert_score, reference)
 
 
 if __name__ == "__main__":
