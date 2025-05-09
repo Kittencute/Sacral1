@@ -1,10 +1,9 @@
 from langchain_chroma import Chroma
 from retriever import Retriever
 from langchain_ollama import OllamaEmbeddings
-from langchain.chat_models import ChatOllama
-from langchain.memory import ConversationSummaryBufferMemory
 import re
 import ollama
+from memory import create_summary_memory
 
 
 class MDUBot:
@@ -12,27 +11,14 @@ class MDUBot:
         self.model = model_name
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
 
-        # Initialize vector store and retriever
         self.db = Chroma(embedding_function=self.embed_model, persist_directory=persist_path)
         self.retriever = Retriever(self.db, self.embed_model)
-
-        # LangChain LLM wrapper for memory summarization
-        self.llm = ChatOllama(model=self.model)
-
-        # Summarizing memory buffer
-        self.memory = ConversationSummaryBufferMemory(
-            llm=self.llm,
-            memory_key="chat_history",
-            return_messages=True,
-            max_token_limit=1000  # Adjust based on desired summary length
-        )
+        self.memory = create_summary_memory(model_name=self.model)
 
     def run(self):
         test_prompts = [
-            "What are the prerequisites for CDT406?",
             "What are the prerequisites for DVA494?",
-            "What are the prerequisites for DVA493?",
-            "What are the prerequisites for ELA210?",
+            "What are the prerequisites for CDT406?",
             "Is that course active this year?",
             "exit"
         ]
@@ -48,14 +34,11 @@ class MDUBot:
             program_code = re.findall(r'\b[a-z]{2,3}\d{2}\b', prompt_cleaned)
             num_codes = len(course_code) or len(program_code)
 
-            # Retrieve relevant documents
             context = self.retriever.query(prompt_cleaned, course_code, program_code, num_codes)
             context_text = "\n".join([doc.page_content for doc in context]) if context else "No documents found."
 
-            # Load summarized conversation history
             summary_context = self.memory.load_memory_variables({})["chat_history"]
 
-            # Construct system prompt with summary + context
             system_prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
 
 Here is the summary of the conversation so far:
@@ -75,24 +58,18 @@ Answer the question by:
 - Answer in the same language as the question.
 """
 
-            # Ask Ollama to generate a reply using current summary + context
             response = ollama.chat(
                 model=self.model,
-                messages=[
-                    {"role": "user", "content": system_prompt}
-                ]
+                messages=[{"role": "user", "content": system_prompt}]
             )
             bot_reply = response['message']['content']
 
-            # Print bot response
             print(f"\nMDUBot: {bot_reply}")
 
-            # Update summarizing memory
             self.memory.chat_memory.add_user_message(prompt)
             self.memory.chat_memory.add_ai_message(bot_reply)
 
 
-# Run the bot
 if __name__ == "__main__":
     bot = MDUBot()
     bot.run()
