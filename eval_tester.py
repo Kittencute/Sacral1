@@ -9,7 +9,7 @@ class EvalTester:
         self.embed_model = embed_model
         os.makedirs(log_dir, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.log_file = os.path.join(log_dir, f"eval_{timestamp}.txt")
+        self.log_file = os.path.join(log_dir, f"pm_eval_{timestamp}.txt")
 
     def compute_cosine_similarity(self, text1, text2):
         emb1 = self.embed_model.embed_query(text1)

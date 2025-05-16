@@ -7,14 +7,15 @@ from langchain_ollama import OllamaEmbeddings
 import re
 import ollama
 from eval_tester import EvalTester
-from test_data import test_prompts
+from test_data import test_prompts, complex_test_prompts
+from program_mapper import get_replacements_for_program, extract_course_info
 
 cosine_scores = []
 bert_scores = []
 class MDUBot:
     # Change model_name, embed_model_name or persist_path if needed
     # model_name = "gemma3:4b" or :1b
-    def __init__(self, model_name="gemma3:4b", embed_model_name="mxbai-embed-large", persist_path="./chroma"): 
+    def __init__(self, model_name="gemma3-4b-ctx20k", embed_model_name="mxbai-embed-large", persist_path="./chroma"): 
         self.model = model_name
         self.embed_model = OllamaEmbeddings(model=embed_model_name)
         self.db = Chroma(embedding_function=self.embed_model, persist_directory=persist_path)
@@ -24,7 +25,7 @@ class MDUBot:
                     
     def run(self):        
         while True:
-            item = test_prompts.pop(0) 
+            item = complex_test_prompts.pop(0) 
             user_prompt = item["prompt"]
             reference = item["reference"]
             print(f"Test prompt: {user_prompt}")
@@ -38,15 +39,17 @@ class MDUBot:
                 break
             
             intent_llm_prompt = (
-                "You are an information extractor for university course queries.\n"
+                "You are an information extractor for queries.\n"
                 "Extract and label only the following fields from the user's question.\n"
                 "Use this exact format, and leave any field blank if not found:\n\n"
                 "course_name: \n"
                 "program_name: \n"
                 "keywords: \n\n"
                 "Rules:\n"
-                "- 'course_name' is any phrase that sounds like a course (e.g., 'Lärande system').\n"
-                "- 'program_name' contains the word 'program' or 'programmet' (e.g., 'Sjuksköterskeprogrammet').\n"
+                "- A course code has exactly 3 letters followed by 3 digits (e.g., DVA222, cdt406).\n"
+                "- A program code has exactly 3 letters followed by 2 digits (e.g., CCV20, dat21).\n"
+                "- 'course_name' is any phrase that sounds like a course (e.g., 'Lärande system, Signalbehandling, Envariabelkalkyl, Mätteknik').\n"
+                "- 'program_name' contains the word 'program' or 'programmet' (e.g., 'Civilingenjörsprogrammet i robotik').\n"
                 "- 'keywords' reflect what the user is asking about (e.g., overview, prerequisites, examination).\n"
                 "- Do **not** include course or program codes — that is handled separately.\n"
                 "- Do **not** include codes in the course or program names.\n"
@@ -54,15 +57,35 @@ class MDUBot:
             )
             
             intent_response = ollama.chat(
-                model="gemma3:4b",
+                model="gemma3-4b-ctx20k",
                 messages=[
                     {"role": "system", "content": intent_llm_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
             )["message"]["content"].lower().strip()
+            
+            print(intent_response)
+            
+            parsed = self.retriver.parse_intent_response(intent_response)
+            
+            # Regex pattern for course and program codes
+            course_code_pattern = re.compile(r'^[a-zA-Z]{2,3}\d{3}$')
+            program_code_pattern = re.compile(r'^[a-zA-Z]{2,3}\d{2}$')
+            # Filter out any names that are just codes
+            course_names = [
+                name for name in parsed["course_names"]
+                if not course_code_pattern.match(name.strip())
+            ]
 
-            result = self.retriver.query(user_prompt, intent_response)
-                      
+            program_names = [
+                name for name in parsed["program_names"]
+                if not program_code_pattern.match(name.strip())
+            ]
+            
+            keywords = parsed["keywords"]
+            print(course_names, program_names, keywords)
+            result = get_replacements_for_program(program_names[0], course_names[0])
+            
             llm_prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
                         Here is the context about the course or program:\n{result}\n
                         This is the question: {user_prompt}\n

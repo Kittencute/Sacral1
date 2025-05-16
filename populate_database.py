@@ -8,6 +8,7 @@ def load_courses():
     def metadata_func(record: dict, metadata: dict) -> dict:
         metadata["course_code"] = record.get("kurskod").lower()
         metadata["course_name"] = record.get("name").lower()
+        
         return metadata
     
     path = "mdu_data_url/course/courses.jsonl"

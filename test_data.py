@@ -1,12 +1,26 @@
-test_prompts = [
+complex_test_prompts = [
     {
+        "prompt": "For what courses can i change mekatronik in the program Civilingenjörsprogrammet i robotik?",
+        "reference": ""
+    },
+    {
+        "prompt": "In civilingenjörsprogrammet i robotik what do i need lärande system for?",
+        "reference": ""
+    },
+    {
+        "prompt": "exit",
+        "reference": ""
+    },    
+    '''{
         "prompt": "what is the course tillämpad artificiell intelligens about and dva493?",
         "reference": ""
     },
     {
         "prompt": "I like advnaced mathematics, can you recommend 5 specific courses related to this?",
         "reference": ""
-    },
+    },'''
+]
+test_prompts = [
     {
         "prompt": "What are the examination components in CDT406?",
         "reference": """Examination:

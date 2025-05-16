@@ -8,6 +8,51 @@ class Retriever:
         self.embed_model = embed_model
         self.db = chroma_client
         
+    def fuzzy_word(self, docs, name, field_name, cutoff=0.6):
+        name_map = {}
+        for doc in docs:
+            key = doc.metadata.get(field_name, "").lower()
+            if key:
+                name_map.setdefault(key, []).append(doc)
+
+        target = name.lower()
+        closest = difflib.get_close_matches(target, list(name_map.keys()), n=1, cutoff=0.7)
+
+        if closest:
+            return name_map[closest[0]]
+        else:
+            # fallback: return everything if nothing matched above cutoff
+            all_docs = []
+            for key in name_map:
+                all_docs.extend(name_map[key])
+            return all_docs
+                
+    def extract_name(self, user_prompt):
+        # Normalize text
+        cleaned = user_prompt.lower()
+
+        # Define blacklist of filler words
+        blacklist = {
+            "what", "is", "can", "i", "in", "the", "and", "or", "of", "about", "to", "for",
+            "you", "it", "on", "a", "an", "do", "does", "that", "with", "from", "be", "any"
+        }
+
+        # Tokenize first and remove filler words
+        words = re.findall(r'\b[a-zåäö]{2,}\b', cleaned)
+        filtered_words = [w for w in words if w not in blacklist]
+
+        # Rejoin to a cleaned string for name pattern extraction
+        filtered_text = " ".join(filtered_words)
+
+        # Extract possible name-like sequences (up to 4 words)
+        candidates = re.findall(r'\b[a-zåäö]{3,}(?:\s+[a-zåäö]{2,}){0,3}\b', filtered_text)
+
+        return candidates  
+    def search_semantic_name(self, db, name): 
+        # Perform a semantic search for the name
+        docs = db.similarity_search(name, k=30)
+        return docs     
+
     def parse_intent_response(self, intent_response: str) -> dict:
         """Extract and clean course names, program names, and keywords from LLM output."""
         fields = {
@@ -36,11 +81,12 @@ class Retriever:
     def query(self, user_prompt, intent_response):
         # Normalize input
         user_prompt = user_prompt.lower().strip()
-        
+
         # Extract codes
         course_code = re.findall(r'\b[a-z]{2,3}\d{3}\b', user_prompt)
         program_code = re.findall(r'\b[a-z]{2,3}\d{2}\b', user_prompt)
-        
+
+        print(user_prompt)
         # Extract course and program names
         parsed = self.parse_intent_response(intent_response)
         
@@ -58,6 +104,7 @@ class Retriever:
             name for name in parsed["program_names"]
             if not program_code_pattern.match(name.strip())
         ]
+        
         keywords = parsed["keywords"]
         
         print(course_code, program_code)
@@ -72,7 +119,7 @@ class Retriever:
         # Search for each course code
         if course_code:
             for code in course_code:
-                results = self.db.similarity_search(user_prompt, k=1, filter={"course_code": code})
+                results = self.db.similarity_search(user_prompt, k=1, filter={"course_code": code})      
                 code_c_docs.extend(results)
 
         # Search for each program code
@@ -84,38 +131,16 @@ class Retriever:
         # Search for each course name
         if course_names:
             for name in course_names:
-                results = self.db.similarity_search(name, k=30)
+                results = self.search_semantic_name(self.db, name)
+                results = self.fuzzy_word(results, name, "course_name")
                 sem_c_docs.extend(results)
 
         # Search for each program name 
         if program_names:
             for name in program_names:
-                results = self.db.similarity_search(name, k=30)
+                results = self.search_semantic_name(self.db, name)
+               # results = self.fuzzy_word(results, name, "program_name")
                 sem_p_docs.extend(results)
-        
-        # Course name fuzzy match
-        if course_names:
-            target_course = course_names[0].lower()
-            course_name_map = {
-                doc.metadata.get("course_name", "").lower(): doc
-                for doc in sem_c_docs if "course_name" in doc.metadata
-            }
-            closest_course = difflib.get_close_matches(target_course, list(course_name_map.keys()), n=1, cutoff=0.6)
-            if closest_course:
-                closest_name = closest_course[0]
-                sem_c_docs = [doc for doc in sem_c_docs if doc.metadata.get("course_name", "").lower() == closest_name]
-
-        # Program name fuzzy match
-        if program_names:
-            target_program = program_names[0].lower()
-            program_name_map = {
-                doc.metadata.get("program_name", "").lower(): doc
-                for doc in sem_p_docs if "program_name" in doc.metadata
-            }
-            closest_program = difflib.get_close_matches(target_program, list(program_name_map.keys()), n=1, cutoff=0.6)
-            if closest_program:
-                closest_name = closest_program[0]
-                sem_p_docs = [doc for doc in sem_p_docs if doc.metadata.get("program_name", "").lower() == closest_name]
                      
         # Combine all docs
         docs = code_c_docs + sem_c_docs + code_p_docs + sem_p_docs
@@ -134,26 +159,16 @@ class Retriever:
         for doc in docs:
             doc.page_content = doc.page_content.encode().decode("unicode_escape") 
             
-        blocks = []
-
         for doc in docs:
             meta = doc.metadata
-            code = meta.get("course_code") or meta.get("program_code", "")
-            name = meta.get("course_name") or meta.get("program_name", "")
-            label = "COURSE" if "course_code" in meta else "PROGRAM"
+            course_code = meta.get("course_code")
+            course_name = meta.get("course_name")
+            program_code = meta.get("program_code")
+            program_name = meta.get("program_name")
 
-            try:
-                # Try to load and pretty-print JSON
-                content_json = json.loads(doc.page_content)
-                content_pretty = json.dumps(content_json, indent=2, ensure_ascii=False)
-            except Exception:
-                # If it's not valid JSON, just use it as-is
-                content_pretty = doc.page_content.strip()
-
-            blocks.append(
-                f"--- {label}: {code or '[No Code]'} ---\n"
-                f"Name: {name or '[No Name]'}\n\n"
-                f"{content_pretty}"
-            )
+            if course_code:
+                print(f"Course Code: {course_code}\tCourse Name: {course_name or 'N/A'}")
+            elif program_code:
+                print(f"Program Code: {program_code}\tProgram Name: {program_name or 'N/A'}")
 
         return docs
