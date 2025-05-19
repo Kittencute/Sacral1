@@ -1,5 +1,5 @@
 from langchain_chroma import Chroma
-from retriever import Retriever
+from testretriever import Retriever
 from langchain_ollama import OllamaEmbeddings
 import re
 import ollama
@@ -32,10 +32,27 @@ class MDUBot:
         # Collect all course and program codes from metadata
         all_course_codes = {meta.get('course_code', '').lower() for meta in all_metadata if 'course_code' in meta}
         all_program_codes = {meta.get('program_code', '').lower() for meta in all_metadata if 'program_code' in meta}
+        course_name_to_code = {
+            meta.get('course_name', '').lower(): meta.get('course_code', '')
+            for meta in all_metadata if 'course_name' in meta and 'course_code' in meta
+        }
 
         # Keep only valid codes that are actually in the database
         valid_course_code = [code for code in course_code if code in all_course_codes]
         valid_program_code = [code for code in program_code if code in all_program_codes]
+
+        # Extract course names from prompt
+        found_course_names = []
+        prompt_lower = prompt.lower()
+        for cname in course_name_to_code:
+            if cname and cname in prompt_lower and cname not in found_course_names:
+                found_course_names.append(cname)
+
+        # Map found names to codes if not already in valid_course_code
+        for name in found_course_names:
+            code = course_name_to_code.get(name)
+            if code and code.lower() not in valid_course_code:
+                valid_course_code.append(code.lower())
 
         # If no codes found, classify and extract topic keywords
         if not valid_course_code and not valid_program_code:
@@ -58,7 +75,22 @@ class MDUBot:
 
             topic_keywords = [k.strip() for k in topic_keywords_raw.split(",") if k.strip()]
 
-        return valid_course_code, valid_program_code, topic_keywords
+        return valid_course_code, valid_program_code, found_course_names, topic_keywords
+
+    def get_metadata_mappings(self):
+        """
+        Retrieve and prepare metadata mappings for course codes and names.
+        """
+        all_metadata = self.db._collection.get(include=["metadatas"])["metadatas"]
+        course_name_to_code = {
+            meta.get('course_name', '').lower(): meta.get('course_code', '')
+            for meta in all_metadata if 'course_name' in meta and 'course_code' in meta
+        }
+        code_to_name = {
+            meta.get('course_code', '').lower(): meta.get('course_name', '')
+            for meta in all_metadata if 'course_code' in meta
+        }
+        return all_metadata, course_name_to_code, code_to_name
 
     def run(self):
         # Show welcome message with example questions
@@ -77,12 +109,10 @@ Try asking things like:
   eg: Recommend advanced math courses.
 """)
         
-        
         while True:
             item = test_prompts.pop(0)
             prompt = item["prompt"]
             reference = item["reference"]
-            # prompt = test_prompts.pop(0)
             print(f"\nTest prompt: {prompt}")
 
             if prompt == "exit":
@@ -93,45 +123,50 @@ Try asking things like:
                 break
 
             # Preprocess the query to extract course code, program code, and topic keywords
-            course_code, program_code, topic_keywords = self.preprocess_query(prompt)
+            course_code, program_code, found_course_names, topic_keywords = self.preprocess_query(prompt)
 
             print(f"Course code: {course_code}")
             print(f"Program code: {program_code}")
+            print(f"Course names: {found_course_names}")
             print(f"Topic keywords: {topic_keywords}")
             print(f"Retrieving for: {' '.join(topic_keywords) if topic_keywords else prompt}")
 
-            # Decide how to search based on the extracted codes
-            if course_code:
-                selected_code = course_code
-                selected_program = None
-                num_codes = len(course_code)
-                prompt_for_search = course_code[0]  # Search with course code
-            elif program_code:
-                selected_code = None
-                selected_program = program_code
-                num_codes = len(program_code)
-                prompt_for_search = program_code[0]  # Search with program code
+            # --- Initialize metadata mappings ---
+            all_metadata, course_name_to_code, code_to_name = self.get_metadata_mappings()
+            context_sections = []
+            used_codes = set()
+
+            # --- Retrieve documents for course or program codes ---
+            if course_code or program_code:
+                all_course_codes = course_code + [course_name_to_code.get(cname) for cname in found_course_names if course_name_to_code.get(cname)]
+                docs = self.retriver.query_multiple(prompt, course_codes=all_course_codes, num_codes=5)
+                if docs:
+                    context = "\n".join([doc.page_content for doc in docs])
+                    context_sections.append(f"=== Retrieved Documents ===\n{context}\n")
+            elif topic_keywords:
+                # Use all extracted topic keywords as a single prompt
+                topic_query = " ".join(topic_keywords)
+                docs = self.retriver.query(topic_query, num_codes=15)
+                if docs:
+                    context = "\n".join([doc.page_content for doc in docs])
+                    context_sections.append(f"=== Retrieved Topic Documents ===\n{context}\n")
             else:
-                selected_code = None
-                selected_program = None
-                num_codes = 15
-                prompt_for_search = " ".join(topic_keywords) if topic_keywords else prompt
+                # --- Fallback to general search if no specific context found ---
+                docs = self.retriver.query(prompt, num_codes=15)
+                if docs:
+                    context = "\n".join([doc.page_content for doc in docs])
+                    context_sections.append(f"=== General context ===\n{context}\n")
 
-            # Ask the retriever for relevant documents
-            result_docs = self.retriver.query(
-                prompt_for_search,
-                course_code=selected_code,
-                program_code=selected_program,
-                num_codes=num_codes
-            )
-            result = "\n".join([doc.page_content for doc in result_docs])
+            result = "\n".join(context_sections)
 
-            # Create a new promt to send to the LLM with the context
+            # Create a new prompt to send to the LLM with the context
             full_prompt = f"""You are an assistant helping answer questions about university courses and programs at Mälardalens universitet (MDU).
-Here is the context about the course or program:\n{result}\n
-This is the question: {prompt}\n
+Here is the context about the course(s) or program(s):
+{result}
+This is the question: {prompt}
+
 Answer the question by:
-- Providing relevant information from the context.
+- Providing relevant information from the context, clearly separated for each course or program if multiple are mentioned.
 - Using your knowledge to generate a response.
 - Ensuring the response is accurate and helpful.
 - Using the correct course or program codes when referring to specific courses or programs.
@@ -146,8 +181,13 @@ Answer the question by:
                     {"role": "user", "content": full_prompt}
                 ]
             )
-            final_response = response["message"]["content"]
-            print(f"\nMDUBot: {response['message']['content']}\n")
+            # Ensure proper Unicode handling for the LLM response
+            try:
+                final_response = response["message"]["content"].encode('utf-8').decode('utf-8')
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                final_response = response["message"]["content"]
+
+            print(f"\nMDUBot: {final_response}\n")
 
             cos_score = self.evaluator.compute_cosine_similarity(prompt, final_response)
             cosine_scores.append(cos_score)

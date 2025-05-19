@@ -32,4 +32,3 @@ class Retriever:
                 pass # Ignore if decode fails
 
         return docs
-
