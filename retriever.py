@@ -10,25 +10,61 @@ class Retriever:
 
         # If course codes are found, search for each one and collect results
         if course_code:
-            for code in course_code:
+            for code in set(course_code):
                 results = self.db.similarity_search(prompt, k=num_codes, filter={"course_code": code})
                 docs.extend(results)
 
-        # If no course codes, try using program codes instead
-        elif program_code:
-            for code in program_code:
+        # If program codes are found, search for each one and collect results
+        if program_code:
+            for code in set(program_code):
                 results = self.db.similarity_search(prompt, k=num_codes, filter={"program_code": code})
                 docs.extend(results)
 
-        # If no course or program codes are found, perform a general search
+        # If no course or program codes are found, perform a general keyword-based search
         if not docs:
-            docs = self.db.similarity_search(prompt, k=num_codes)
+            results = self.db.similarity_search(prompt, k=num_codes)
+            docs.extend(results)
 
-        # Try to fix any weird unicode in the results so they look better
+        # Ensure proper Unicode handling
         for doc in docs:
             try:
-                doc.page_content = doc.page_content.encode().decode('unicode_escape')
-            except Exception:
-                pass # Ignore if decode fails
+                doc.page_content = doc.page_content.encode().decode("unicode_escape")
+            except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
+                pass  # If decoding fails, leave the content as is
+
+        return docs
+
+    def query_multiple(self, prompt, course_codes=None, program_codes=None, num_codes=5):
+        """
+        Retrieve documents for multiple course or program codes.
+        """
+        docs = []
+        seen = set()
+
+        if course_codes:
+            for code in set(course_codes):
+                results = self.db.similarity_search(prompt, k=num_codes, filter={"course_code": code})
+                for doc in results:
+                    if doc.page_content not in seen:
+                        # Ensure proper Unicode handling
+                        try:
+                            doc.page_content = doc.page_content.encode().decode("unicode_escape")
+                        except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
+                            pass
+                        docs.append(doc)
+                        seen.add(doc.page_content)
+
+        if program_codes:
+            for code in set(program_codes):
+                results = self.db.similarity_search(prompt, k=num_codes, filter={"program_code": code})
+                for doc in results:
+                    if doc.page_content not in seen:
+                        # Ensure proper Unicode handling
+                        try:
+                            doc.page_content = doc.page_content.encode().decode("unicode_escape")
+                        except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
+                            pass
+                        docs.append(doc)
+                        seen.add(doc.page_content)
 
         return docs
