@@ -125,11 +125,11 @@ Try asking things like:
             # Preprocess the query to extract course code, program code, and topic keywords
             course_code, program_code, found_course_names, topic_keywords = self.preprocess_query(prompt)
 
-            print(f"Course code: {course_code}")
-            print(f"Program code: {program_code}")
-            print(f"Course names: {found_course_names}")
-            print(f"Topic keywords: {topic_keywords}")
-            print(f"Retrieving for: {' '.join(topic_keywords) if topic_keywords else prompt}")
+            #print(f"Course code: {course_code}")
+            #print(f"Program code: {program_code}")
+            #print(f"Course names: {found_course_names}")
+            #print(f"Topic keywords: {topic_keywords}")
+            #print(f"Retrieving for: {' '.join(topic_keywords) if topic_keywords else prompt}")
 
             # --- Initialize metadata mappings ---
             all_metadata, course_name_to_code, code_to_name = self.get_metadata_mappings()
@@ -146,7 +146,19 @@ Try asking things like:
             elif topic_keywords:
                 # Use all extracted topic keywords as a single prompt
                 topic_query = " ".join(topic_keywords)
-                docs = self.retriver.query(topic_query, num_codes=15)
+                # For advanced, filter for advanced level only
+                if "advanced" in topic_query:
+                    # Retrieve more docs to ensure coverage
+                    docs = self.retriver.query(topic_query, num_codes=30)
+                    # Filter for advanced level using metadata if available
+                    advanced_docs = []
+                    for doc in docs:
+                        utbildningsniva = getattr(doc, "metadata", {}).get("utbildningsnivå", "").lower()
+                        if "avancerad" in utbildningsniva:
+                            advanced_docs.append(doc)
+                    docs = advanced_docs
+                else:
+                    docs = self.retriver.query(topic_query, num_codes=15)
                 if docs:
                     context = "\n".join([doc.page_content for doc in docs])
                     context_sections.append(f"=== Retrieved Topic Documents ===\n{context}\n")
@@ -167,6 +179,9 @@ This is the question: {prompt}
 
 Answer the question by:
 - Providing relevant information from the context, clearly separated for each course or program if multiple are mentioned.
+- If there is more than one of the same course, always choose the latest.
+- Only include the necessary information to answer the question. Do not provide extra details or unrelated information.
+- Structure your answer clearly using bullet points, headings, and lists where appropriate, so it is easy to read in a terminal.
 - Using your knowledge to generate a response.
 - Ensuring the response is accurate and helpful.
 - Using the correct course or program codes when referring to specific courses or programs.
@@ -203,4 +218,3 @@ Answer the question by:
 if __name__ == "__main__":
     bot = MDUBot()
     bot.run()
-

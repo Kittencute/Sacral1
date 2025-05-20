@@ -28,8 +28,8 @@ class Retriever:
         # Ensure proper Unicode handling
         for doc in docs:
             try:
-                doc.page_content = doc.page_content.encode('utf-8').decode('utf-8')
-            except (UnicodeEncodeError, UnicodeDecodeError):
+                doc.page_content = doc.page_content.encode().decode("unicode_escape")
+            except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
                 pass  # If decoding fails, leave the content as is
 
         return docs
@@ -48,8 +48,8 @@ class Retriever:
                     if doc.page_content not in seen:
                         # Ensure proper Unicode handling
                         try:
-                            doc.page_content = doc.page_content.encode('utf-8').decode('utf-8')
-                        except (UnicodeEncodeError, UnicodeDecodeError):
+                            doc.page_content = doc.page_content.encode().decode("unicode_escape")
+                        except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
                             pass
                         docs.append(doc)
                         seen.add(doc.page_content)
@@ -61,11 +61,10 @@ class Retriever:
                     if doc.page_content not in seen:
                         # Ensure proper Unicode handling
                         try:
-                            doc.page_content = doc.page_content.encode('utf-8').decode('utf-8')
-                        except (UnicodeEncodeError, UnicodeDecodeError):
+                            doc.page_content = doc.page_content.encode().decode("unicode_escape")
+                        except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
                             pass
                         docs.append(doc)
                         seen.add(doc.page_content)
 
         return docs
-
